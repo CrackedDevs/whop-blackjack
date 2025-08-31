@@ -12,14 +12,14 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({ card, index = 0 }) => 
   
   if (card.hidden) {
     return (
-      <View style={[styles.card, styles.cardBack, { marginLeft: index * -30 }]}>
+      <View style={[styles.card, styles.cardBack, { marginLeft: index * -40 }]}>
         <View style={styles.cardBackPattern} />
       </View>
     );
   }
   
   return (
-    <View style={[styles.card, { marginLeft: index * -30 }]}>
+    <View style={[styles.card, { marginLeft: index * -40 }]}>
       <Text style={[styles.rank, isRed && styles.redText]}>{card.rank}</Text>
       <Text style={[styles.suit, isRed && styles.redText]}>{card.suit}</Text>
       <Text style={[styles.centerSuit, isRed && styles.redText]}>{card.suit}</Text>
@@ -29,57 +29,58 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({ card, index = 0 }) => 
 
 const styles = StyleSheet.create({
   card: {
-    width: 80,
-    height: 120,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333',
-    padding: 8,
+    width: 90,
+    height: 130,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    padding: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
     position: 'relative',
   },
   cardBack: {
-    backgroundColor: '#2c3e50',
+    backgroundColor: '#1e293b',
     justifyContent: 'center',
     alignItems: 'center',
+    borderColor: '#334155',
   },
   cardBackPattern: {
-    width: '80%',
-    height: '80%',
-    backgroundColor: '#34495e',
-    borderRadius: 4,
+    width: '75%',
+    height: '75%',
+    backgroundColor: '#374151',
+    borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#1abc9c',
+    borderColor: '#3b82f6',
   },
   rank: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
     position: 'absolute',
-    top: 8,
-    left: 8,
+    top: 10,
+    left: 10,
   },
   suit: {
-    fontSize: 18,
-    color: '#000',
+    fontSize: 16,
+    color: '#1f2937',
     position: 'absolute',
-    top: 30,
-    left: 8,
+    top: 32,
+    left: 10,
   },
   centerSuit: {
-    fontSize: 40,
-    color: '#000',
+    fontSize: 36,
+    color: '#1f2937',
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -15 }, { translateY: -20 }],
+    transform: [{ translateX: -18 }, { translateY: -18 }],
   },
   redText: {
-    color: '#e74c3c',
+    color: '#dc2626',
   },
 });
