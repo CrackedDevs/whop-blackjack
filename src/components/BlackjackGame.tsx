@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { useBlackjackGame } from '../hooks/useBlackjackGame';
 import { PlayingCard } from './PlayingCard';
 
@@ -16,6 +16,80 @@ export const BlackjackGame: React.FC = () => {
   } = useBlackjackGame();
   
   const [betInput, setBetInput] = useState('50');
+  const [showResult, setShowResult] = useState(false);
+  const [animatedDealerValue, setAnimatedDealerValue] = useState(0);
+  const [animatedPlayerValue, setAnimatedPlayerValue] = useState(0);
+  
+  const dealerValueAnim = useRef(new Animated.Value(0)).current;
+  const playerValueAnim = useRef(new Animated.Value(0)).current;
+
+  // Calculate animation delay based on number of cards
+  const getAnimationDelay = (hand: any) => {
+    return hand.cards.length * 150 + 600; // Card stagger delay + card animation duration
+  };
+
+  // Animate hand values counting up
+  useEffect(() => {
+    if (playerHand.cards.length > 0) {
+      const currentValue = playerValueAnim._value;
+      playerValueAnim.setValue(currentValue);
+      
+      Animated.timing(playerValueAnim, {
+        toValue: playerHand.value,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+
+      // Listen to animation values
+      const listener = playerValueAnim.addListener(({ value }) => {
+        setAnimatedPlayerValue(Math.floor(value));
+      });
+
+      return () => playerValueAnim.removeListener(listener);
+    }
+  }, [playerHand.value]);
+
+  useEffect(() => {
+    if (dealerHand.cards.length > 0 && !dealerHand.cards.some(c => c.hidden)) {
+      const currentValue = dealerValueAnim._value;
+      dealerValueAnim.setValue(currentValue);
+      
+      Animated.timing(dealerValueAnim, {
+        toValue: dealerHand.value,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+
+      const listener = dealerValueAnim.addListener(({ value }) => {
+        setAnimatedDealerValue(Math.floor(value));
+      });
+
+      return () => dealerValueAnim.removeListener(listener);
+    }
+  }, [dealerHand.value, dealerHand.cards.some(c => c.hidden)]);
+
+  // Handle result display timing
+  useEffect(() => {
+    if (gameResult) {
+      setShowResult(false);
+      // Show result after a brief delay to let value animations finish
+      setTimeout(() => {
+        setShowResult(true);
+      }, 800);
+    } else {
+      setShowResult(false);
+    }
+  }, [gameResult]);
+
+  // Reset animations when game resets
+  useEffect(() => {
+    if (gameStatus === 'betting') {
+      playerValueAnim.setValue(0);
+      dealerValueAnim.setValue(0);
+      setAnimatedPlayerValue(0);
+      setAnimatedDealerValue(0);
+    }
+  }, [gameStatus]);
 
   const handleBet = () => {
     const amount = parseInt(betInput);
@@ -44,132 +118,109 @@ export const BlackjackGame: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.header}>
-        <Text style={styles.title}>♠️ BLACKJACK ♥️</Text>
-        <View style={styles.balanceContainer}>
-          <Text style={styles.balanceLabel}>Balance:</Text>
-          <Text style={styles.balance}>${balance}</Text>
-        </View>
-      </View>
-
+    <ScrollView 
+      style={styles.container} 
+      contentContainerStyle={styles.contentContainer}
+      overScrollMode="never"
+      bounces={false}
+    >
       {/* Dealer's Hand */}
-      <View style={styles.handSection}>
-        <Text style={styles.handTitle}>Dealer</Text>
+      <View style={styles.dealerSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Dealer</Text>
+          {!dealerHand.cards.some(c => c.hidden) && dealerHand.cards.length > 0 && (
+            <View style={styles.valueBadge}>
+              <Text style={styles.valueBadgeText}>
+                {animatedDealerValue || dealerHand.value}
+              </Text>
+            </View>
+          )}
+        </View>
         <View style={styles.cardsContainer}>
           {dealerHand.cards.map((card, index) => (
             <PlayingCard key={index} card={card} index={index} />
           ))}
         </View>
-        {!dealerHand.cards.some(c => c.hidden) && dealerHand.cards.length > 0 && (
-          <Text style={styles.handValue}>
-            {dealerHand.value}{dealerHand.isSoft ? ' (soft)' : ''}
-            {dealerHand.isBust && ' - BUST!'}
-          </Text>
-        )}
       </View>
 
+
       {/* Game Result */}
-      {gameResult && (
-        <View style={styles.resultContainer}>
-          <Text style={styles.resultText}>{getResultMessage()}</Text>
+      <View style={styles.resultContainer}>
+        <Text style={styles.resultText}>
+          {showResult ? getResultMessage() : ''}
+        </Text>
+      </View>
+
+      {/* Fixed Controls Container */}
+      <View style={styles.fixedControlsContainer}>
+        <View style={styles.controlsWrapper}>
+          {gameStatus === 'betting' && (
+            <TouchableOpacity
+              onPress={() => actions.startNewGame(50)}
+              style={[styles.actionButton, styles.hitButton]}
+            >
+              <Text style={styles.actionButtonText}>Start Game</Text>
+            </TouchableOpacity>
+          )}
+
+          {gameStatus === 'playing' && (
+            <>
+              <TouchableOpacity
+                onPress={actions.hit}
+                style={[styles.actionButton, styles.hitButton]}
+              >
+                <Text style={styles.actionButtonText}>HIT</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={actions.stand}
+                style={[styles.actionButton, styles.standButton]}
+              >
+                <Text style={styles.actionButtonText}>STAND</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {gameStatus === 'ended' && (
+            <TouchableOpacity
+              onPress={() => {
+                // Reset animations immediately
+                setShowResult(false);
+                playerValueAnim.setValue(0);
+                dealerValueAnim.setValue(0);
+                setAnimatedPlayerValue(0);
+                setAnimatedDealerValue(0);
+                // Start new game
+                actions.startNewGame(50);
+              }}
+              style={[styles.actionButton, styles.hitButton]}
+            >
+              <Text style={styles.actionButtonText}>New Game</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      )}
+      </View>
 
       {/* Player's Hand */}
-      <View style={styles.handSection}>
-        <Text style={styles.handTitle}>Your Hand</Text>
+      <View style={styles.playerSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Player</Text>
+          {playerHand.cards.length > 0 && (
+            <View style={styles.valueBadge}>
+              <Text style={styles.valueBadgeText}>
+                {animatedPlayerValue || playerHand.value}
+              </Text>
+            </View>
+          )}
+        </View>
         <View style={styles.cardsContainer}>
           {playerHand.cards.map((card, index) => (
             <PlayingCard key={index} card={card} index={index} />
           ))}
         </View>
-        {playerHand.cards.length > 0 && (
-          <Text style={styles.handValue}>
-            {playerHand.value}{playerHand.isSoft ? ' (soft)' : ''}
-            {playerHand.isBust && ' - BUST!'}
-          </Text>
-        )}
       </View>
 
-      {/* Betting Controls */}
-      {gameStatus === 'betting' && (
-        <View style={styles.bettingContainer}>
-          <Text style={styles.betLabel}>Place your bet:</Text>
-          <View style={styles.betInputContainer}>
-            <TextInput
-              style={styles.betInput}
-              value={betInput}
-              onChangeText={setBetInput}
-              keyboardType="numeric"
-              placeholder="Enter bet amount"
-            />
-            <TouchableOpacity 
-              style={styles.betButton}
-              onPress={handleBet}
-            >
-              <Text style={styles.buttonText}>Deal</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.quickBets}>
-            {[10, 25, 50, 100].map(amount => (
-              <TouchableOpacity
-                key={amount}
-                style={styles.quickBetButton}
-                onPress={() => setBetInput(amount.toString())}
-              >
-                <Text style={styles.quickBetText}>${amount}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
 
-      {/* Game Controls */}
-      {gameStatus === 'playing' && (
-        <View style={styles.controlsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.hitButton]}
-            onPress={actions.hit}
-          >
-            <Text style={styles.buttonText}>Hit</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.actionButton, styles.standButton]}
-            onPress={actions.stand}
-          >
-            <Text style={styles.buttonText}>Stand</Text>
-          </TouchableOpacity>
-          
-          {canDouble && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.doubleButton]}
-              onPress={actions.double}
-            >
-              <Text style={styles.buttonText}>Double</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {/* New Game Button */}
-      {gameStatus === 'ended' && (
-        <TouchableOpacity
-          style={[styles.actionButton, styles.newGameButton]}
-          onPress={actions.reset}
-        >
-          <Text style={styles.buttonText}>New Game</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Current Bet Display */}
-      {bet > 0 && gameStatus !== 'betting' && (
-        <View style={styles.currentBetContainer}>
-          <Text style={styles.currentBetLabel}>Current Bet: </Text>
-          <Text style={styles.currentBet}>${bet}</Text>
-        </View>
-      )}
     </ScrollView>
   );
 };
@@ -177,204 +228,144 @@ export const BlackjackGame: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: 'black',
+    height: '100vh',
   },
   contentContainer: {
-    padding: 24,
-    paddingBottom: 40,
-    maxWidth: 800,
-    alignSelf: 'center',
+    padding: 40,
+    paddingBottom: 60,
+    alignSelf: 'stretch',
     width: '100%',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    position: 'relative',
+    flexGrow: 1,
   },
-  header: {
-    marginBottom: 32,
+  dealerSection: {
     alignItems: 'center',
+    marginBottom: 40,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#f8fafc',
-    marginBottom: 16,
-    letterSpacing: 0.5,
+  playerSection: {
+    alignItems: 'center',
+    marginTop: 40,
   },
-  balanceContainer: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
+    marginBottom: 20,
   },
-  balanceLabel: {
-    fontSize: 16,
-    color: '#94a3b8',
-    marginRight: 8,
-  },
-  balance: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#fbbf24',
-  },
-  handSection: {
-    marginVertical: 24,
-    alignItems: 'center',
-  },
-  handTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '500',
-    color: '#e2e8f0',
-    marginBottom: 16,
-    letterSpacing: 0.3,
+    color: 'white',
+    marginRight: 12,
+  },
+  valueBadge: {
+    backgroundColor: '#4a5568',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  valueBadgeText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   cardsContainer: {
     flexDirection: 'row',
-    minHeight: 120,
-    marginBottom: 16,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  handValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#f8fafc',
-    backgroundColor: '#374151',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#4b5563',
+  betDisplay: {
+    alignItems: 'center',
+    marginVertical: 30,
+  },
+  betAmount: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#22c55e',
   },
   resultContainer: {
-    backgroundColor: '#1e293b',
-    padding: 20,
-    borderRadius: 12,
-    marginVertical: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
+    marginVertical: 20,
+    height: 30,
+    justifyContent: 'center',
   },
   resultText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#f8fafc',
+    color: 'white',
   },
   bettingContainer: {
-    backgroundColor: '#1e293b',
-    padding: 24,
-    borderRadius: 12,
-    marginTop: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  betLabel: {
-    fontSize: 16,
-    color: '#e2e8f0',
-    marginBottom: 16,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  betInputContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    gap: 12,
-  },
-  betInput: {
-    flex: 1,
-    backgroundColor: '#374151',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#4b5563',
-  },
-  betButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-    minWidth: 80,
+    alignItems: 'center',
+    marginTop: 40,
   },
   quickBets: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 16,
   },
-  quickBetButton: {
-    backgroundColor: '#374151',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 1,
+  fixedControlsContainer: {
+    height: 80,
+    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#4b5563',
+    marginVertical: 30,
   },
-  quickBetText: {
-    color: '#e2e8f0',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  controlsContainer: {
+  controlsWrapper: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  actionButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 100,
+    gap: 16,
+    height: 50,
     alignItems: 'center',
-    borderWidth: 1,
   },
-  hitButton: {
-    backgroundColor: '#059669',
-    borderColor: '#10b981',
-  },
-  standButton: {
-    backgroundColor: '#dc2626',
-    borderColor: '#ef4444',
-  },
-  doubleButton: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#8b5cf6',
-  },
-  newGameButton: {
+  quickBetButton: {
     backgroundColor: '#3b82f6',
-    borderColor: '#60a5fa',
-    marginTop: 24,
-    alignSelf: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    minWidth: 80,
+    alignItems: 'center',
   },
-  buttonText: {
-    color: '#f8fafc',
+  quickBetText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-  currentBetContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
-    backgroundColor: '#374151',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderColor: '#4b5563',
+  actionButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    minWidth: 80,
+    alignItems: 'center',
   },
-  currentBetLabel: {
-    fontSize: 14,
-    color: '#94a3b8',
+  hitButton: {
+    backgroundColor: '#3b82f6',
   },
-  currentBet: {
-    fontSize: 14,
+  standButton: {
+    backgroundColor: '#3b82f6',
+  },
+  doubleButton: {
+    backgroundColor: '#64748b',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#fbbf24',
+  },
+  newGameButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginTop: 30,
+  },
+  newGameButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

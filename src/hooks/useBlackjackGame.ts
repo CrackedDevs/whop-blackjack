@@ -50,21 +50,24 @@ const getCardValue = (card: Card): number => {
 
 const calculateHandValue = (cards: Card[]): Hand => {
   let value = 0;
-  let aces = 0;
+  let totalAces = 0;
   
   for (const card of cards) {
     if (!card.hidden) {
       value += getCardValue(card);
-      if (card.rank === 'A') aces++;
+      if (card.rank === 'A') totalAces++;
     }
   }
   
-  // Adjust for aces
-  while (value > 21 && aces > 0) {
+  // Adjust for aces (count how many we converted from 11 to 1)
+  let acesAsOne = 0;
+  while (value > 21 && acesAsOne < totalAces) {
     value -= 10;
-    aces--;
+    acesAsOne++;
   }
   
+  // Hand is soft if we have aces and at least one is still counted as 11
+  const acesAsEleven = totalAces - acesAsOne;
   const visibleCards = cards.filter(c => !c.hidden);
   
   return {
@@ -72,7 +75,7 @@ const calculateHandValue = (cards: Card[]): Hand => {
     value,
     isBust: value > 21,
     isBlackjack: visibleCards.length === 2 && value === 21,
-    isSoft: aces > 0 && value <= 21
+    isSoft: acesAsEleven > 0 && value <= 21
   };
 };
 
@@ -167,8 +170,56 @@ export const useBlackjackGame = () => {
     if (handValue.isBust) {
       setGameStatus('ended');
       setGameResult('player_bust');
+    } else if (handValue.value === 21) {
+      // Automatically stand when player reaches 21
+      setGameStatus('dealer');
+      setCanDouble(false);
+      setCanSplit(false);
+      
+      // Trigger dealer's turn after a delay
+      setTimeout(() => {
+        // Reveal dealer's hole card and play dealer's turn
+        let newDealerHand = dealerHand.map(card => ({ ...card, hidden: false }));
+        let currentDeck = remainingDeck;
+        
+        // Dealer draws until 17 or higher
+        let dealerValue = calculateHandValue(newDealerHand);
+        while (dealerValue.value < 17) {
+          const [dealerCard, updatedDeck] = dealCard(currentDeck);
+          newDealerHand.push(dealerCard);
+          currentDeck = updatedDeck;
+          dealerValue = calculateHandValue(newDealerHand);
+        }
+        
+        setDealerHand(newDealerHand);
+        setDeck(currentDeck);
+        
+        // Determine winner
+        let result: GameResult;
+        let payout = 0;
+        
+        if (dealerValue.isBust) {
+          result = 'player_win';
+          payout = bet * 2;
+        } else if (handValue.value > dealerValue.value) {
+          result = 'player_win';
+          payout = bet * 2;
+        } else if (handValue.value < dealerValue.value) {
+          result = 'dealer_win';
+          payout = 0;
+        } else {
+          result = 'push';
+          payout = bet;
+        }
+        
+        setGameStatus('ended');
+        setGameResult(result);
+        if (payout > 0) {
+          setBalance(prev => prev + payout);
+        }
+      }, 500);
     }
-  }, [deck, playerHand, gameStatus, dealCard]);
+  }, [deck, playerHand, dealerHand, gameStatus, bet, dealCard]);
 
   const stand = useCallback(() => {
     if (gameStatus !== 'playing') return;
