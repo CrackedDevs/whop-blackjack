@@ -5,9 +5,10 @@ import { Card } from '../hooks/useBlackjackGame';
 interface PlayingCardProps {
   card: Card;
   index?: number;
+  animationTrigger?: number;
 }
 
-export const PlayingCard: React.FC<PlayingCardProps> = ({ card, index = 0 }) => {
+export const PlayingCard: React.FC<PlayingCardProps> = ({ card, index = 0, animationTrigger = 0 }) => {
   const isRed = card.suit === '♥' || card.suit === '♦';
   
   // Animation values
@@ -17,39 +18,69 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({ card, index = 0 }) => 
   const flipAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   
+  // Track if this card has been initially animated
+  const hasAnimated = useRef(false);
+  
   // Animate card entrance
   useEffect(() => {
-    const delay = index * 150; // Stagger cards
+    if (animationTrigger > 0) {
+      // Reset for new game
+      hasAnimated.current = false;
+      slideAnim.setValue(-200);
+      scaleAnim.setValue(0.8);
+      rotateAnim.setValue(0);
+      opacityAnim.setValue(0);
+    }
     
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: index * -40,
+    if (!hasAnimated.current) {
+      // First time animation for this card
+      const delay = animationTrigger > 0 ? index * 150 : 0; // Stagger for new game, immediate for new cards
+      
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: index * -40,
+          duration: 600,
+          delay,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 400,
+          delay,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 300,
+          delay,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      
+      Animated.timing(rotateAnim, {
+        toValue: (index - 1) * 2,
         duration: 600,
         delay,
         useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 400,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 300,
-        delay,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    
-    // Add a slight rotation for dynamic effect
-    Animated.timing(rotateAnim, {
-      toValue: (index - 1) * 2, // Slight rotation based on position
-      duration: 600,
-      delay,
-      useNativeDriver: true,
-    }).start();
-  }, [index]);
+      }).start();
+      
+      hasAnimated.current = true;
+    } else {
+      // Repositioning animation for existing cards
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: index * -40,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotateAnim, {
+          toValue: (index - 1) * 2,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [index, animationTrigger]);
   
   // Animate card flip when revealed
   useEffect(() => {

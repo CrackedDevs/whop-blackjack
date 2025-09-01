@@ -19,6 +19,7 @@ export const BlackjackGame: React.FC = () => {
   const [showResult, setShowResult] = useState(false);
   const [animatedDealerValue, setAnimatedDealerValue] = useState(0);
   const [animatedPlayerValue, setAnimatedPlayerValue] = useState(0);
+  const [animationTrigger, setAnimationTrigger] = useState(0);
   
   const dealerValueAnim = useRef(new Animated.Value(0)).current;
   const playerValueAnim = useRef(new Animated.Value(0)).current;
@@ -81,6 +82,15 @@ export const BlackjackGame: React.FC = () => {
     }
   }, [gameResult]);
 
+  // Auto-start first game on initial load
+  useEffect(() => {
+    if (gameStatus === 'betting' && playerHand.cards.length === 0 && dealerHand.cards.length === 0) {
+      // This is the initial load, auto-start the game
+      setAnimationTrigger(prev => prev + 1);
+      actions.startNewGame(50);
+    }
+  }, []); // Run only once on mount
+
   // Reset animations when game resets
   useEffect(() => {
     if (gameStatus === 'betting') {
@@ -128,17 +138,24 @@ export const BlackjackGame: React.FC = () => {
       <View style={styles.dealerSection}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Dealer</Text>
-          {!dealerHand.cards.some(c => c.hidden) && dealerHand.cards.length > 0 && (
-            <View style={styles.valueBadge}>
-              <Text style={styles.valueBadgeText}>
-                {animatedDealerValue || dealerHand.value}
-              </Text>
-            </View>
-          )}
+          <View style={styles.valueBadgeContainer}>
+            {!dealerHand.cards.some(c => c.hidden) && dealerHand.cards.length > 0 && (
+              <View style={styles.valueBadge}>
+                <Text style={styles.valueBadgeText}>
+                  {animatedDealerValue || dealerHand.value}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
         <View style={styles.cardsContainer}>
           {dealerHand.cards.map((card, index) => (
-            <PlayingCard key={index} card={card} index={index} />
+            <PlayingCard 
+              key={`${card.suit}${card.rank}${card.hidden ? '-hidden' : ''}`}
+              card={card} 
+              index={index} 
+              animationTrigger={animationTrigger}
+            />
           ))}
         </View>
       </View>
@@ -153,69 +170,82 @@ export const BlackjackGame: React.FC = () => {
 
       {/* Fixed Controls Container */}
       <View style={styles.fixedControlsContainer}>
-        <View style={styles.controlsWrapper}>
-          {gameStatus === 'betting' && (
-            <TouchableOpacity
-              onPress={() => actions.startNewGame(50)}
-              style={[styles.actionButton, styles.hitButton]}
-            >
-              <Text style={styles.actionButtonText}>Start Game</Text>
-            </TouchableOpacity>
-          )}
+        {/* Start Game Button - Absolute Position */}
+        {gameStatus === 'betting' && (
+          <TouchableOpacity
+            onPress={() => {
+              setAnimationTrigger(prev => prev + 1);
+              actions.startNewGame(50);
+            }}
+            style={[styles.actionButton, styles.hitButton, styles.wideButton, styles.absoluteCenterButton]}
+          >
+            <Text style={styles.actionButtonText}>Start Game</Text>
+          </TouchableOpacity>
+        )}
 
-          {gameStatus === 'playing' && (
-            <>
-              <TouchableOpacity
-                onPress={actions.hit}
-                style={[styles.actionButton, styles.hitButton]}
-              >
-                <Text style={styles.actionButtonText}>HIT</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                onPress={actions.stand}
-                style={[styles.actionButton, styles.standButton]}
-              >
-                <Text style={styles.actionButtonText}>STAND</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {gameStatus === 'ended' && (
+        {/* Playing Buttons - Absolute Position */}
+        {gameStatus === 'playing' && (
+          <>
             <TouchableOpacity
-              onPress={() => {
-                // Reset animations immediately
-                setShowResult(false);
-                playerValueAnim.setValue(0);
-                dealerValueAnim.setValue(0);
-                setAnimatedPlayerValue(0);
-                setAnimatedDealerValue(0);
-                // Start new game
-                actions.startNewGame(50);
-              }}
-              style={[styles.actionButton, styles.hitButton]}
+              onPress={actions.hit}
+              style={[styles.actionButton, styles.hitButton, styles.absoluteLeftButton]}
             >
-              <Text style={styles.actionButtonText}>New Game</Text>
+              <Text style={styles.actionButtonText}>HIT</Text>
             </TouchableOpacity>
-          )}
-        </View>
+            
+            <TouchableOpacity
+              onPress={actions.stand}
+              style={[styles.actionButton, styles.standButton, styles.absoluteRightButton]}
+            >
+              <Text style={styles.actionButtonText}>STAND</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* New Game Button - Absolute Position */}
+        {gameStatus === 'ended' && (
+          <TouchableOpacity
+            onPress={() => {
+              // Reset animations immediately
+              setShowResult(false);
+              playerValueAnim.setValue(0);
+              dealerValueAnim.setValue(0);
+              setAnimatedPlayerValue(0);
+              setAnimatedDealerValue(0);
+              // Trigger card entry animation
+              setAnimationTrigger(prev => prev + 1);
+              // Start new game
+              actions.startNewGame(50);
+            }}
+            style={[styles.actionButton, styles.hitButton, styles.wideButton, styles.absoluteCenterButton]}
+          >
+            <Text style={styles.actionButtonText}>New Game</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Player's Hand */}
       <View style={styles.playerSection}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Player</Text>
-          {playerHand.cards.length > 0 && (
-            <View style={styles.valueBadge}>
-              <Text style={styles.valueBadgeText}>
-                {animatedPlayerValue || playerHand.value}
-              </Text>
-            </View>
-          )}
+          <View style={styles.valueBadgeContainer}>
+            {playerHand.cards.length > 0 && (
+              <View style={styles.valueBadge}>
+                <Text style={styles.valueBadgeText}>
+                  {animatedPlayerValue || playerHand.value}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
         <View style={styles.cardsContainer}>
           {playerHand.cards.map((card, index) => (
-            <PlayingCard key={index} card={card} index={index} />
+            <PlayingCard 
+              key={`${card.suit}${card.rank}`}
+              card={card} 
+              index={index} 
+              animationTrigger={animationTrigger}
+            />
           ))}
         </View>
       </View>
@@ -253,12 +283,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
+    position: 'relative',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '500',
     color: 'white',
     marginRight: 12,
+  },
+  valueBadgeContainer: {
+    position: 'absolute',
+    left: 60,
+    top: -4,
+    width: 30,
+    height: 30,
   },
   valueBadge: {
     backgroundColor: '#4a5568',
@@ -309,9 +347,8 @@ const styles = StyleSheet.create({
   },
   fixedControlsContainer: {
     height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 30,
+    marginVertical: 20,
+    position: 'relative',
   },
   controlsWrapper: {
     flexDirection: 'row',
@@ -340,6 +377,10 @@ const styles = StyleSheet.create({
     minWidth: 80,
     alignItems: 'center',
   },
+  wideButton: {
+    minWidth: 300,
+    justifyContent: 'center',
+  },
   hitButton: {
     backgroundColor: '#3b82f6',
   },
@@ -353,6 +394,27 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  absoluteCenterButton: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    marginLeft: -150,
+    marginTop: -25,
+  },
+  absoluteLeftButton: {
+    position: 'absolute',
+    right: '50%',
+    top: '50%',
+    marginRight: 8,
+    marginTop: -25,
+  },
+  absoluteRightButton: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    marginLeft: 8,
+    marginTop: -25,
   },
   newGameButton: {
     backgroundColor: '#3b82f6',
