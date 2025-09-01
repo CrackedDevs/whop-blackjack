@@ -152,7 +152,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -18 }, { translateY: -18 }],
+    transform: [{ translateX: -18 }, { translateY: -24 }],
+    textAlign: 'center',
   },
   redText: {
     color: '#dc2626',
