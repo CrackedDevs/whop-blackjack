@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Card } from '../hooks/useBlackjackGame';
 
 interface PlayingCardProps {
@@ -10,20 +10,94 @@ interface PlayingCardProps {
 export const PlayingCard: React.FC<PlayingCardProps> = ({ card, index = 0 }) => {
   const isRed = card.suit === '♥' || card.suit === '♦';
   
+  // Animation values
+  const slideAnim = useRef(new Animated.Value(-200)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const flipAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  
+  // Animate card entrance
+  useEffect(() => {
+    const delay = index * 150; // Stagger cards
+    
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: index * -40,
+        duration: 600,
+        delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 400,
+        delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 300,
+        delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Add a slight rotation for dynamic effect
+    Animated.timing(rotateAnim, {
+      toValue: (index - 1) * 2, // Slight rotation based on position
+      duration: 600,
+      delay,
+      useNativeDriver: true,
+    }).start();
+  }, [index]);
+  
+  // Animate card flip when revealed
+  useEffect(() => {
+    if (!card.hidden) {
+      Animated.timing(flipAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [card.hidden]);
+  
+  const animatedStyle = {
+    transform: [
+      { translateX: slideAnim },
+      { scale: scaleAnim },
+      { rotateZ: rotateAnim.interpolate({
+        inputRange: [-10, 10],
+        outputRange: ['-10deg', '10deg'],
+      }) },
+    ],
+    opacity: opacityAnim,
+  };
+  
   if (card.hidden) {
     return (
-      <View style={[styles.card, styles.cardBack, { marginLeft: index * -40 }]}>
+      <Animated.View style={[styles.card, styles.cardBack, animatedStyle]}>
         <View style={styles.cardBackPattern} />
-      </View>
+      </Animated.View>
     );
   }
   
   return (
-    <View style={[styles.card, { marginLeft: index * -40 }]}>
+    <Animated.View style={[styles.card, animatedStyle, {
+      transform: [
+        ...animatedStyle.transform,
+        { 
+          rotateY: flipAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['180deg', '0deg'],
+          })
+        }
+      ]
+    }]}>
       <Text style={[styles.rank, isRed && styles.redText]}>{card.rank}</Text>
       <Text style={[styles.suit, isRed && styles.redText]}>{card.suit}</Text>
       <Text style={[styles.centerSuit, isRed && styles.redText]}>{card.suit}</Text>
-    </View>
+    </Animated.View>
   );
 };
 
